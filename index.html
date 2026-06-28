@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Gastos — Julia & Pedro</title>
+<style>
+  :root {
+    --verde: #1baf7a; --verde-claro: #eaf3de; --verde-texto: #27500a;
+    --amarelo: #eda100; --amarelo-claro: #faeeda; --amarelo-texto: #633806;
+    --vermelho: #e34948; --vermelho-claro: #fcebeb; --vermelho-texto: #791f1f;
+    --azul: #2a78d6; --azul-claro: #e6f1fb; --azul-texto: #0c447c;
+    --cinza: #888780; --cinza-claro: #f1efe8; --borda: rgba(0,0,0,0.09);
+    --texto: #0b0b0b; --texto-sec: #52514e; --fundo: #f7f6f3; --branco: #ffffff; --radius: 12px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--fundo); color: var(--texto); min-height: 100vh; }
+
+  .topo { position:fixed; top:0; left:0; right:0; z-index:50; background:var(--verde); padding:0.85rem 1rem 0; box-shadow:0 2px 16px rgba(0,0,0,0.13); }
+  .topo-titulo { display:flex; justify-content:space-between; align-items:center; margin-bottom:0.65rem; }
+  .topo-titulo h1 { color:white; font-size:1rem; font-weight:700; }
+  .topo-meta { color:rgba(255,255,255,0.75); font-size:0.72rem; text-align:right; }
+  .sync-dot { display:inline-block; width:7px; height:7px; border-radius:50%; background:#4ade80; margin-right:4px; }
+  .sync-dot.off { background:#f87171; }
+  .sync-dot.loading { background:#fbbf24; animation: pulse 1s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  .tabs { display:flex; gap:4px; margin-bottom:0; }
+  .tab { flex:1; padding:0.5rem 0; text-align:center; font-size:0.78rem; font-weight:600; color:rgba(255,255,255,0.65); border:none; background:none; cursor:pointer; border-bottom:2px solid transparent; transition:all 0.15s; }
+  .tab.ativo { color:white; border-bottom-color:white; }
+
+  .painel { background:white; border-radius:14px 14px 0 0; padding:0.9rem 1rem 0.8rem; display:none; }
+  .painel.ativo { display:block; }
+
+  .entrada-valor-wrap { display:flex; align-items:center; gap:8px; margin-bottom:0.65rem; }
+  .cifrao { font-size:1.4rem; font-weight:700; color:var(--texto-sec); flex-shrink:0; }
+  .inp-valor { flex:1; border:none; outline:none; font-size:2rem; font-weight:700; color:var(--texto); background:transparent; width:100%; min-width:0; }
+  .inp-valor::placeholder { color:#ccc; }
+
+  .entrada-linha2 { display:flex; gap:8px; align-items:center; }
+  .inp-desc { flex:1; border:1.5px solid var(--borda); border-radius:8px; padding:0.5rem 0.7rem; font-size:0.88rem; color:var(--texto); background:var(--fundo); outline:none; min-width:0; transition:border-color 0.2s; }
+  .inp-desc:focus { border-color:var(--verde); }
+  .sel-cat { flex-shrink:0; border:1.5px solid var(--borda); border-radius:8px; padding:0.5rem 0.5rem; font-size:0.82rem; color:var(--texto); background:var(--fundo); outline:none; appearance:none; -webkit-appearance:none; cursor:pointer; max-width:130px; }
+  .btn-lancar { flex-shrink:0; background:var(--verde); color:white; border:none; border-radius:8px; padding:0.5rem 0.9rem; font-size:0.88rem; font-weight:600; cursor:pointer; white-space:nowrap; }
+  .btn-lancar:active { background:#179065; transform:scale(0.97); }
+
+  .sms-area { width:100%; min-height:72px; border:1.5px solid var(--borda); border-radius:8px; padding:0.65rem 0.75rem; font-size:0.88rem; color:var(--texto); background:var(--fundo); outline:none; resize:none; font-family:inherit; transition:border-color 0.2s; line-height:1.5; }
+  .sms-area:focus { border-color:var(--verde); }
+  .sms-area::placeholder { color:#bbb; }
+  .sms-preview { display:none; margin-top:0.6rem; padding:0.65rem 0.8rem; background:var(--azul-claro); border-radius:8px; border-left:3px solid var(--azul); font-size:0.82rem; color:var(--azul-texto); line-height:1.6; }
+  .sms-preview.show { display:block; }
+  .sms-cat-row { display:flex; align-items:center; gap:8px; margin-top:0.55rem; font-size:0.82rem; color:var(--texto-sec); }
+  .sms-cat-row label { white-space:nowrap; }
+  .sms-cat-row select { flex:1; border:1.5px solid var(--borda); border-radius:8px; padding:0.4rem 0.5rem; font-size:0.82rem; background:var(--fundo); outline:none; appearance:none; -webkit-appearance:none; }
+  .sms-btns { display:flex; gap:8px; margin-top:0.65rem; }
+  .btn-sms-ok { flex:2; background:var(--verde); color:white; border:none; border-radius:8px; padding:0.55rem; font-size:0.88rem; font-weight:600; cursor:pointer; }
+  .btn-sms-ok:disabled { background:var(--cinza); cursor:default; }
+  .btn-sms-limpar { flex:1; background:none; border:1.5px solid var(--borda); border-radius:8px; padding:0.55rem; font-size:0.88rem; color:var(--texto-sec); cursor:pointer; }
+
+  .conteudo { padding:0 0 2rem; }
+  .resumo-card { background:white; margin:0.75rem 0.85rem 0; border-radius:var(--radius); padding:1rem; border:1px solid var(--borda); }
+  .resumo-row { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:0.45rem; }
+  .resumo-label { font-size:0.7rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--cinza); font-weight:600; }
+  .resumo-total { font-size:1.55rem; font-weight:800; }
+  .resumo-de { font-size:0.8rem; color:var(--cinza); }
+  .barra-bg { background:var(--cinza-claro); border-radius:8px; height:10px; overflow:hidden; margin-bottom:0.45rem; }
+  .barra-fill { height:10px; border-radius:8px; transition:width 0.4s, background 0.3s; }
+  .resumo-bottom { display:flex; justify-content:space-between; font-size:0.76rem; color:var(--texto-sec); }
+  .restante { font-weight:700; }
+
+  .kpi-row { display:grid; grid-template-columns:1fr 1fr 1fr; gap:0.5rem; margin:0.5rem 0.85rem 0; }
+  .kpi { background:white; border-radius:10px; padding:0.65rem 0.5rem; border:1px solid var(--borda); text-align:center; }
+  .kpi-lbl { font-size:0.62rem; text-transform:uppercase; letter-spacing:0.04em; color:var(--cinza); margin-bottom:3px; }
+  .kpi-val { font-size:0.95rem; font-weight:700; }
+
+  .alerta { margin:0.5rem 0.85rem 0; padding:0.6rem 0.85rem; border-radius:8px; font-size:0.79rem; line-height:1.5; border-left:3px solid; display:none; }
+  .alerta.show { display:block; }
+  .alerta.ok     { background:var(--verde-claro); border-color:var(--verde); color:var(--verde-texto); }
+  .alerta.warn   { background:var(--amarelo-claro); border-color:var(--amarelo); color:var(--amarelo-texto); }
+  .alerta.danger { background:var(--vermelho-claro); border-color:var(--vermelho); color:var(--vermelho-texto); }
+
+  .sec-titulo { font-size:0.67rem; text-transform:uppercase; letter-spacing:0.07em; color:var(--cinza); font-weight:700; margin:1rem 0.85rem 0.4rem; }
+  .cat-card { background:white; margin:0 0.85rem 0.5rem; border-radius:var(--radius); border:1px solid var(--borda); overflow:hidden; }
+  .cat-header { display:flex; align-items:center; gap:10px; padding:0.75rem 0.9rem 0.5rem; }
+  .cat-icon { width:34px; height:34px; border-radius:9px; display:flex; align-items:center; justify-content:center; font-size:1rem; flex-shrink:0; }
+  .cat-nome { font-size:0.86rem; font-weight:600; }
+  .cat-dica { font-size:0.68rem; color:var(--cinza); margin-top:1px; }
+  .cat-nums { margin-left:auto; text-align:right; }
+  .cat-gasto { font-size:1rem; font-weight:700; }
+  .cat-limite-txt { font-size:0.68rem; color:var(--cinza); }
+  .cat-barra-bg { height:3px; background:var(--cinza-claro); margin:0 0.9rem; }
+  .cat-barra-fill { height:3px; border-radius:0 2px 2px 0; transition:width 0.4s; }
+  .cat-lancs { padding:0.35rem 0.9rem 0.65rem; }
+  .vazio { font-size:0.73rem; color:var(--cinza); text-align:center; padding:0.25rem 0; }
+  .lanc { display:flex; align-items:center; padding:0.38rem 0; border-top:1px solid var(--cinza-claro); font-size:0.79rem; gap:5px; }
+  .lanc-autor { font-size:0.62rem; padding:1px 5px; border-radius:3px; flex-shrink:0; font-weight:600; }
+  .lanc-pedro { background:#e6f1fb; color:#0c447c; }
+  .lanc-julia  { background:#eaf3de; color:#27500a; }
+  .lanc-sms    { background:#faeeda; color:#633806; }
+  .lanc-desc { flex:1; color:var(--texto-sec); overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+  .lanc-data { color:var(--cinza); font-size:0.68rem; flex-shrink:0; }
+  .lanc-val { font-weight:600; color:var(--vermelho); flex-shrink:0; }
+  .lanc-del { background:none; border:none; color:var(--cinza); cursor:pointer; font-size:1.05rem; padding:0 0 0 3px; flex-shrink:0; line-height:1; }
+
+  .quem-row { display:flex; gap:6px; margin-bottom:0.65rem; }
+  .btn-quem { flex:1; padding:0.45rem; border-radius:8px; border:2px solid var(--borda); background:var(--fundo); font-size:0.85rem; cursor:pointer; font-weight:600; transition:all 0.15s; color:var(--cinza); }
+  .btn-quem.ativo-pedro { border-color:var(--azul); background:var(--azul-claro); color:var(--azul-texto); }
+  .btn-quem.ativo-julia { border-color:var(--verde); background:var(--verde-claro); color:var(--verde-texto); }
+
+  .toast { position:fixed; bottom:1.5rem; left:50%; transform:translateX(-50%) translateY(20px); background:#0b0b0b; color:white; padding:0.6rem 1.2rem; border-radius:20px; font-size:0.82rem; opacity:0; transition:all 0.25s; pointer-events:none; white-space:nowrap; z-index:200; }
+  .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+  .btn-reset { display:block; margin:1.25rem auto 0; background:none; border:none; color:var(--cinza); font-size:0.72rem; cursor:pointer; text-decoration:underline; }
+
+  .loading-overlay { position:fixed; inset:0; background:var(--verde); display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:999; transition:opacity 0.4s; }
+  .loading-overlay.hide { opacity:0; pointer-events:none; }
+  .loading-logo { font-size:2.5rem; margin-bottom:1rem; }
+  .loading-txt { color:white; font-size:1rem; font-weight:600; }
+  .loading-sub { color:rgba(255,255,255,0.7); font-size:0.8rem; margin-top:6px; }
+</style>
+</head>
+<body>
+
+<div class="loading-overlay" id="loading">
+  <div class="loading-logo">💳</div>
+  <div class="loading-txt">Carregando gastos...</div>
+  <div class="loading-sub">Conectando ao banco de dados</div>
+</div>
+
+<div class="topo" id="topo">
+  <div class="topo-titulo">
+    <h1>💳 Gastos do Cartão</h1>
+    <div class="topo-meta">
+      <span class="sync-dot loading" id="sync-dot"></span><span id="sync-txt">conectando...</span><br>
+      Fecha 28/07 · <span id="data-hoje"></span>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab ativo" onclick="trocarTab('manual')" id="tab-manual">✏️ Manual</button>
+    <button class="tab" onclick="trocarTab('sms')" id="tab-sms">📱 Colar SMS</button>
+  </div>
+
+  <div class="painel ativo" id="painel-manual">
+    <div class="quem-row">
+      <button class="btn-quem ativo-pedro" id="btn-pedro" onclick="setQuem('pedro')">👨 Pedro</button>
+      <button class="btn-quem" id="btn-julia" onclick="setQuem('julia')">👩 Julia</button>
+    </div>
+    <div class="entrada-valor-wrap">
+      <span class="cifrao">R$</span>
+      <input class="inp-valor" type="number" id="inp-valor" placeholder="0,00" step="0.01" min="0" inputmode="decimal" />
+    </div>
+    <div class="entrada-linha2">
+      <input class="inp-desc" type="text" id="inp-desc" placeholder="Descrição..." />
+      <select class="sel-cat" id="inp-cat"></select>
+      <button class="btn-lancar" onclick="lancar()">✓ OK</button>
+    </div>
+  </div>
+
+  <div class="painel" id="painel-sms">
+    <div class="quem-row">
+      <button class="btn-quem ativo-pedro" id="btn-pedro-sms" onclick="setQuemSMS('pedro')">👨 Pedro</button>
+      <button class="btn-quem" id="btn-julia-sms" onclick="setQuemSMS('julia')">👩 Julia</button>
+    </div>
+    <textarea class="sms-area" id="sms-area" placeholder="Cole aqui o SMS do Bradesco...&#10;Ex: Bradesco: Compra de R$59,90 em NETFLIX em 20/06." oninput="parsearSMS()" rows="3"></textarea>
+    <div class="sms-preview" id="sms-preview"></div>
+    <div class="sms-cat-row" id="sms-cat-row" style="display:none">
+      <label>Categoria:</label>
+      <select id="sms-cat"></select>
+    </div>
+    <div class="sms-btns">
+      <button class="btn-sms-limpar" onclick="limparSMS()">Limpar</button>
+      <button class="btn-sms-ok" id="btn-sms-ok" onclick="lancarSMS()" disabled>✓ Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<div class="conteudo" id="conteudo">
+  <div class="resumo-card">
+    <div class="resumo-row"><span class="resumo-label">Gasto total</span><span class="resumo-de">de R$ 985,00</span></div>
+    <div class="resumo-row" style="margin-bottom:0.55rem"><span class="resumo-total" id="total-gasto">R$ 0,00</span></div>
+    <div class="barra-bg"><div class="barra-fill" id="barra-total" style="width:0%"></div></div>
+    <div class="resumo-bottom">
+      <span>Disponível: <span class="restante" id="restante">R$ 985,00</span></span>
+      <span id="pct-label">0%</span>
+    </div>
+  </div>
+
+  <div class="kpi-row">
+    <div class="kpi"><div class="kpi-lbl">Dias restantes</div><div class="kpi-val" id="dias-rest">—</div></div>
+    <div class="kpi"><div class="kpi-lbl">Pode gastar/dia</div><div class="kpi-val" id="por-dia">—</div></div>
+    <div class="kpi"><div class="kpi-lbl">Lançamentos</div><div class="kpi-val" id="qtd-lancs">0</div></div>
+  </div>
+
+  <div class="alerta" id="alerta"></div>
+  <div class="sec-titulo">Por categoria</div>
+  <div id="cats"></div>
+  <button class="btn-reset" onclick="resetar()">↺ Apagar tudo e recomeçar</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getDatabase, ref, push, remove, onValue } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCzsHuE8AVN-AQ9WRf1Bv8erogC35tzxoA",
+  authDomain: "gastos-julia.firebaseapp.com",
+  databaseURL: "https://gastos-julia-default-rtdb.firebaseio.com",
+  projectId: "gastos-julia",
+  storageBucket: "gastos-julia.firebasestorage.app",
+  messagingSenderId: "942010083174",
+  appId: "1:942010083174:web:2ab82b301008750ac20aa7",
+  measurementId: "G-ZPT62W164Z"
+};
+
+const app = initializeApp(firebaseConfig);
+const db  = getDatabase(app);
+const gastosRef = ref(db, 'gastos');
+
+const TOTAL_ORC = 985;
+const FECHA = new Date('2026-07-28');
+
+const CATS = [
+  { id:'mercado',     nome:'Mercado',        icon:'🛒', cor:'#2a78d6', limite:420, dica:'~R$ 105/semana' },
+  { id:'combustivel', nome:'Combustível',    icon:'⛽', cor:'#1baf7a', limite:200, dica:'1 abastecimento' },
+  { id:'farmacia',    nome:'Farmácia',       icon:'💊', cor:'#eda100', limite:80,  dica:'Só urgência' },
+  { id:'lazer',       nome:'Lazer / Jantar', icon:'🍽️', cor:'#4a3aa7', limite:100, dica:'1 saída no mês' },
+  { id:'imprevisto',  nome:'Imprevistos',    icon:'🔧', cor:'#888780', limite:185, dica:'Só se necessário' },
+];
+
+const CAT_KEYWORDS = {
+  mercado:     ['mercado','supermercado','extra','carrefour','atacadao','feira','quitanda','hortifruti','padaria','pao','confeit','lanchonete','casa do pao','tortellote','franvix'],
+  combustivel: ['posto','petrobras','shell','ipiranga','combustivel','gasolina','iate','smart camburi'],
+  farmacia:    ['farmacia','drogasil','drogaria','ultrafarma','pacheco','remedios','raia','nissei'],
+  lazer:       ['cinema','cinemark','netflix','amazon','spotify','bar','cervej','restaurante','sushi','pizza','hamburger','burger','outback','giraffas','esfiha','gaucho','lamar','hood','mister','vento sul','moranga','churros','sorvete','gelado','quintal','beach'],
+};
+
+function adivinharCat(s) {
+  s = s.toLowerCase();
+  for (const [cat, palavras] of Object.entries(CAT_KEYWORDS)) {
+    if (palavras.some(p => s.includes(p))) return cat;
+  }
+  return 'imprevisto';
+}
+
+let gastos = {};
+let quem = 'pedro';
+let quemSMS = 'pedro';
+
+window.setQuem = function(q) {
+  quem = q;
+  document.getElementById('btn-pedro').className = 'btn-quem' + (q==='pedro'?' ativo-pedro':'');
+  document.getElementById('btn-julia').className = 'btn-quem' + (q==='julia'?' ativo-julia':'');
+};
+
+window.setQuemSMS = function(q) {
+  quemSMS = q;
+  document.getElementById('btn-pedro-sms').className = 'btn-quem' + (q==='pedro'?' ativo-pedro':'');
+  document.getElementById('btn-julia-sms').className = 'btn-quem' + (q==='julia'?' ativo-julia':'');
+};
+
+onValue(gastosRef, (snapshot) => {
+  gastos = snapshot.val() || {};
+  document.getElementById('loading').classList.add('hide');
+  setSyncOk(true);
+  render();
+}, (error) => {
+  setSyncOk(false);
+});
+
+function setSyncOk(ok) {
+  const dot = document.getElementById('sync-dot');
+  const txt = document.getElementById('sync-txt');
+  dot.className = 'sync-dot ' + (ok ? '' : 'off');
+  txt.textContent = ok ? 'sincronizado' : 'sem conexão';
+}
+
+window.lancar = async function() {
+  const valor = parseFloat(document.getElementById('inp-valor').value);
+  const desc  = document.getElementById('inp-desc').value.trim();
+  const cat   = document.getElementById('inp-cat').value;
+  if (!valor||valor<=0) { borda('inp-valor'); return; }
+  if (!desc) { borda('inp-desc'); return; }
+  await push(gastosRef, { valor, desc, cat, data: hoje(), quem, origem:'manual' });
+  document.getElementById('inp-valor').value='';
+  document.getElementById('inp-desc').value='';
+  document.getElementById('inp-valor').focus();
+  toast('✓ Lançado por ' + (quem==='pedro'?'Pedro':'Julia') + ' — ' + fmt(valor));
+};
+
+window.parsearSMS = function() {
+  const txt = document.getElementById('sms-area').value.trim();
+  const prev = document.getElementById('sms-preview');
+  const catRow = document.getElementById('sms-cat-row');
+  const btnOk = document.getElementById('btn-sms-ok');
+  if (!txt) { prev.className='sms-preview'; catRow.style.display='none'; btnOk.disabled=true; return; }
+  const valorMatch = txt.match(/R\$\s?([\d.,]+)/i);
+  if (!valorMatch) {
+    prev.className='sms-preview show'; prev.innerHTML='⚠ Não consegui identificar o valor. Use a aba Manual.';
+    prev.style.background='#fcebeb'; prev.style.borderColor='#e34948'; prev.style.color='#791f1f';
+    catRow.style.display='none'; btnOk.disabled=true; return;
+  }
+  const valor = parseFloat(valorMatch[1].replace('.','').replace(',','.'));
+  let estab = '';
+  const patterns = [
+    /(?:na loja|em)\s+([A-Z0-9][^\d][^\n]+?)(?:\s+em\s+\d|\s+\d{2}\/|\.|$)/i,
+    /R\$[\s\d.,]+\s+([A-Z][A-Z0-9 *_\-]+?)(?:\s+\d{2}\/|\s+em\s|\.|$)/i,
+  ];
+  for (const p of patterns) { const m=txt.match(p); if(m&&m[1]&&m[1].trim().length>1){estab=m[1].trim();break;} }
+  if (!estab) estab='Compra no cartão';
+  let data=hoje();
+  const dataMatch=txt.match(/(\d{2})\/(\d{2})(?:\/(\d{2,4}))?/);
+  if (dataMatch) { const dia=dataMatch[1],mes=dataMatch[2],ano=dataMatch[3]?(dataMatch[3].length===2?'20'+dataMatch[3]:dataMatch[3]):'2026'; data=`${ano}-${mes}-${dia}`; }
+  const catSugerida=adivinharCat(estab);
+  const catObj=CATS.find(c=>c.id===catSugerida);
+  prev.style.background=''; prev.style.borderColor=''; prev.style.color='';
+  prev.className='sms-preview show';
+  prev.innerHTML=`<strong>Valor:</strong> R$ ${valor.toFixed(2).replace('.',',')}<br><strong>Estabelecimento:</strong> ${estab}<br><strong>Data:</strong> ${data.split('-').reverse().join('/')}<br><strong>Categoria sugerida:</strong> ${catObj.icon} ${catObj.nome}`;
+  catRow.style.display='flex';
+  document.getElementById('sms-cat').innerHTML=CATS.map(c=>`<option value="${c.id}" ${c.id===catSugerida?'selected':''}>${c.icon} ${c.nome}</option>`).join('');
+  document.getElementById('sms-area').dataset.valor=valor;
+  document.getElementById('sms-area').dataset.desc=estab;
+  document.getElementById('sms-area').dataset.data=data;
+  btnOk.disabled=false;
+};
+
+window.lancarSMS = async function() {
+  const area=document.getElementById('sms-area');
+  const valor=parseFloat(area.dataset.valor);
+  const desc=area.dataset.desc;
+  const data=area.dataset.data;
+  const cat=document.getElementById('sms-cat').value;
+  if (!valor||!desc) return;
+  await push(gastosRef,{valor,desc,cat,data,quem:quemSMS,origem:'sms'});
+  limparSMS();
+  toast('✓ SMS lançado por '+(quemSMS==='pedro'?'Pedro':'Julia')+' — '+fmt(valor));
+};
+
+window.limparSMS = function() {
+  const area=document.getElementById('sms-area');
+  area.value=''; area.dataset.valor=''; area.dataset.desc=''; area.dataset.data='';
+  document.getElementById('sms-preview').className='sms-preview';
+  document.getElementById('sms-cat-row').style.display='none';
+  document.getElementById('btn-sms-ok').disabled=true;
+};
+
+window.remover = async function(id) {
+  if (!confirm('Remover este gasto?')) return;
+  await remove(ref(db,'gastos/'+id));
+};
+
+window.resetar = async function() {
+  if (!confirm('Apagar TODOS os gastos? Isso afeta você e a Julia.')) return;
+  await remove(gastosRef);
+};
+
+window.trocarTab = function(tab) {
+  ['manual','sms'].forEach(t=>{
+    document.getElementById('painel-'+t).classList.toggle('ativo',t===tab);
+    document.getElementById('tab-'+t).classList.toggle('ativo',t===tab);
+  });
+  setTimeout(ajustarPadding,50);
+};
+
+function fmt(v) { return 'R$ '+Math.abs(v).toFixed(2).replace('.',',').replace(/\B(?=(\d{3})+(?!\d))/g,'.'); }
+function hoje() { return new Date().toISOString().split('T')[0]; }
+function diasAte() { const n=new Date(); n.setHours(0,0,0,0); return Math.max(0,Math.round((FECHA-n)/86400000)); }
+function corPct(p) { return p<70?'#1baf7a':p<90?'#eda100':'#e34948'; }
+
+function borda(id) {
+  const el=document.getElementById(id);
+  el.style.borderColor='#e34948'; el.focus();
+  setTimeout(()=>el.style.borderColor='',1000);
+}
+
+function popularSelect() {
+  const opts=CATS.map(c=>`<option value="${c.id}">${c.icon} ${c.nome}</option>`).join('');
+  document.getElementById('inp-cat').innerHTML=opts;
+}
+
+function ajustarPadding() {
+  document.getElementById('conteudo').style.paddingTop=(document.getElementById('topo').offsetHeight+10)+'px';
+}
+
+let toastTimer;
+function toast(msg) {
+  const el=document.getElementById('toast');
+  el.textContent=msg; el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>el.classList.remove('show'),2500);
+}
+
+function render() {
+  ajustarPadding();
+  const d=new Date();
+  document.getElementById('data-hoje').textContent=d.toLocaleDateString('pt-BR',{day:'2-digit',month:'short'});
+
+  const lista=Object.entries(gastos).map(([id,g])=>({...g,id}));
+  const total=lista.reduce((s,g)=>s+g.valor,0);
+  const rest=TOTAL_ORC-total, pct=Math.min(100,(total/TOTAL_ORC)*100);
+  const dias=diasAte(), porDia=dias>0?Math.max(0,rest/dias):0;
+
+  document.getElementById('total-gasto').textContent=fmt(total);
+  document.getElementById('total-gasto').style.color=corPct(pct);
+  document.getElementById('barra-total').style.width=pct+'%';
+  document.getElementById('barra-total').style.background=corPct(pct);
+  document.getElementById('restante').textContent=rest>=0?fmt(rest):'⚠ '+fmt(Math.abs(rest))+' acima';
+  document.getElementById('restante').style.color=corPct(pct);
+  document.getElementById('pct-label').textContent=Math.round(pct)+'%';
+  document.getElementById('dias-rest').textContent=dias+(dias===1?' dia':' dias');
+  const pdEl=document.getElementById('por-dia');
+  pdEl.textContent=fmt(porDia);
+  pdEl.style.color=porDia>=30?'#1baf7a':porDia>=15?'#eda100':'#e34948';
+  document.getElementById('qtd-lancs').textContent=lista.length;
+
+  const al=document.getElementById('alerta');
+  if (rest<0) { al.className='alerta show danger'; al.textContent='⚠ Orçamento estourado em '+fmt(Math.abs(rest))+'. A fatura de agosto vai passar de R$ 3.000.'; }
+  else if (pct>=90) { al.className='alerta show danger'; al.textContent='⚠ Quase no limite! Só '+fmt(rest)+' disponíveis. Só o essencial agora.'; }
+  else if (pct>=70) { al.className='alerta show warn'; al.textContent='⚡ Já usaram '+Math.round(pct)+'% do orçamento. Atenção nos próximos gastos.'; }
+  else if (lista.length===0) { al.className='alerta show ok'; al.textContent='✓ Nenhum gasto ainda. Use as abas acima para registrar.'; }
+  else { al.className='alerta show ok'; al.textContent='✓ Dentro do orçamento. '+fmt(rest)+' disponíveis até 28/07.'; }
+
+  const cont=document.getElementById('cats');
+  cont.innerHTML='';
+  CATS.forEach(cat=>{
+    const catLista=lista.filter(g=>g.cat===cat.id);
+    const gCat=catLista.reduce((s,g)=>s+g.valor,0);
+    const pCat=Math.min(100,(gCat/cat.limite)*100);
+    const corC=gCat>cat.limite?'#e34948':cat.cor;
+    const lancs=catLista.sort((a,b)=>b.data.localeCompare(a.data));
+    const lancsHTML=lancs.length===0
+      ?'<div class="vazio">Nenhum gasto ainda</div>'
+      :lancs.map(g=>{
+          const df=g.data.split('-').reverse().join('/');
+          const autorClass=g.origem==='sms'?'lanc-sms':(g.quem==='julia'?'lanc-julia':'lanc-pedro');
+          const autorLabel=g.origem==='sms'?'SMS':(g.quem==='julia'?'Julia':'Pedro');
+          return `<div class="lanc"><span class="lanc-autor ${autorClass}">${autorLabel}</span><span class="lanc-desc">${g.desc}</span><span class="lanc-data">${df}</span><span class="lanc-val">${fmt(g.valor)}</span><button class="lanc-del" onclick="remover('${g.id}')">×</button></div>`;
+        }).join('');
+    cont.innerHTML+=`
+      <div class="cat-card">
+        <div class="cat-header">
+          <div class="cat-icon" style="background:${cat.cor}20">${cat.icon}</div>
+          <div><div class="cat-nome">${cat.nome}</div><div class="cat-dica">${cat.dica} · limite ${fmt(cat.limite)}</div></div>
+          <div class="cat-nums"><div class="cat-gasto" style="color:${corC}">${fmt(gCat)}</div><div class="cat-limite-txt">${Math.round(pCat)}% usado</div></div>
+        </div>
+        <div class="cat-barra-bg"><div class="cat-barra-fill" style="width:${pCat}%;background:${corC}"></div></div>
+        <div class="cat-lancs">${lancsHTML}</div>
+      </div>`;
+  });
+}
+
+document.getElementById('inp-valor').addEventListener('keydown',e=>{ if(e.key==='Enter') document.getElementById('inp-desc').focus(); });
+document.getElementById('inp-desc').addEventListener('keydown',e=>{ if(e.key==='Enter') window.lancar(); });
+window.addEventListener('resize', ajustarPadding);
+
+popularSelect();
+ajustarPadding();
+</script>
+</body>
+</html>
